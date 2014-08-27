@@ -8,20 +8,24 @@ import pyproj
 # http://www.lfd.uci.edu/~gohlke/pythonlibs/#requests
 import requests
 
-import hashlib
+import hashlib, collections, csv
+
+# http://www.codeforamerica.org/specifications/trails/spec.html
 
 wgs84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 orsp = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
+OUTPUT_PATH = "d:/scratch/transit/"
+
 # read the shapefile
-reader = shapefile.Reader("c:/temp/trails.shp")
+reader = shapefile.Reader("d:/scratch/transit/trails.shp")
 fields = reader.fields[1:]
 field_names = [field[0] for field in fields]
 buffer = []
 conter=0
 
 agencies = {}
-trail_names = {}
+named_trails = {}
 
 for sr in reader.shapeRecords():
 
@@ -31,12 +35,15 @@ for sr in reader.shapeRecords():
 
         # we're only allowing open trails to pass
         if atr['STATUS'].upper() == 'OPEN':
-            props = {}
-            # This is bad news, difficult to hang off of something that is 
-            # semi randomly produced.
+            props = collections.OrderedDict()
+
+            # Hash the name and take the last six digits of the hex rep
+            # In this way we can ensure that agencies get the same id each time
+            # without having to maintain an agency id in house
+
             if atr['AGENCYNAME'] not in agencies.iterkeys():
-                m = hashlib.sha224(agencies.iterkeys().next()).hexdigest()
-                agency_id = int(m[-5:], 16)
+                m = hashlib.sha224(atr['AGENCYNAME']).hexdigest()
+                agency_id = str(int(m[-5:], 16))
                 agencies[atr['AGENCYNAME']] = agency_id
                 
                 """
@@ -46,34 +53,60 @@ for sr in reader.shapeRecords():
                 >>> int(m[-5:], 16)
                 584968
                 """
-
-            props['id'] = str(int(atr['TRAILID']))
+            #Field massage
+            id = props['id'] = str(int(atr['TRAILID']))
             props['steward_id'] = agency_id
-            props['name'] = atr['TRAILNAME'].strip()
+            #props['name'] = atr['TRAILNAME'].strip()
             props['motor_vehicles'] = 'no'
             props['foot'] = 'yes' if atr['HIKE'] == 'Yes' else 'No'
             props['bicycle'] = 'yes' if atr['ROADBIKE'] == 'Yes'\
                 or atr['MTNBIKE'] == 'Yes' else 'no'
             props['horse'] = 'yes' if atr['EQUESTRIAN'] == 'Yes' else 'no'
             props['ski'] = 'no'
+
+            # spec: "yes", "no", "permissive", "designated"
             props['wheelchair'] = 'yes' if atr['ACCESSIBLE'] == 'Accessible' else 'no'
+
             props['osm_tags'] = 'surface='+atr['TRLSURFACE']+';width='+atr['WIDTH']
 
             n_geom = []
             geom = sr.shape.__geo_interface__
             for point in geom['coordinates']:
                 n_geom.append(pyproj.transform(orsp, wgs84, point[0], point[1]))
-    
-            buffer.append(dict(type="Feature", \
-            geometry=n_geom, properties=props))
-            conter +=1 
+            
+            segment= collections.OrderedDict()
+            segment['type']='Feature'
+            segment['properties'] = props
+            segment['geometry'] = n_geom
+
+            trlname= atr['TRAILNAME'].strip()
+            trlsys = atr['SYSTEMNAME'].strip()
+
+            trlname = 'Unnamed' if trlname == "" else trlname
+
+            if trlname+'_'+trlsys not in named_trails.iterkeys():
+                named_trails[trlname+'_'+trlsys] = [id]
+            else:
+                named_trails[trlname+'_'+trlsys].append(id)
+
+            buffer.append(segment)
+            conter +=1
 
 # write the GeoJSON file
 from json import dumps
-geojson = open("c:/temp/trails.json", "w")
-geojson.write(dumps({"type": "FeatureCollection",\
+trail_segments = open(OUTPUT_PATH + "trail_segments.geojson", "w")
+trail_segments.write(dumps({"type": "FeatureCollection",\
 "features": buffer}, indent=2) + "\n")
-geojson.close()
+trail_segments.close()
+
+named_trails_out = open(OUTPUT_PATH + "named_trails.csv", "w")
+named_trails_out.write("name", "segment_ids", "id", "description", "part_of\n")
+
+for k, v in named_trails:
+    
+
+    named_trails_out.write(k.split('_')[0], ';'.join(v), 
+    
 
 print 'done'
 """
