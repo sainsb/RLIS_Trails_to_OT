@@ -8,6 +8,8 @@ import pyproj
 # http://www.lfd.uci.edu/~gohlke/pythonlibs/#requests
 import requests
 
+import hashlib
+
 wgs84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 orsp = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
@@ -19,7 +21,6 @@ buffer = []
 conter=0
 
 agencies = {}
-agency_id_incrementor = 0
 trail_names = {}
 
 for sr in reader.shapeRecords():
@@ -34,11 +35,20 @@ for sr in reader.shapeRecords():
             # This is bad news, difficult to hang off of something that is 
             # semi randomly produced.
             if atr['AGENCYNAME'] not in agencies.iterkeys():
-                agencies[atr['AGENCYNAME']] = agency_id_incrementor
-                agency_id_incrementor += 1
+                m = hashlib.sha224(agencies.iterkeys().next()).hexdigest()
+                agency_id = int(m[-5:], 16)
+                agencies[atr['AGENCYNAME']] = agency_id
+                
+                """
+                t='Hillsboro Parks and Recreation'
+                >>> m=hashlib.sha224(t).hexdigest()
+                'c33f51592f1d24ef759d695dc05602a265832bc1a55918da3228ed08'
+                >>> int(m[-5:], 16)
+                584968
+                """
 
             props['id'] = str(int(atr['TRAILID']))
-            props['steward_id'] = str(agency_id_incrementor -1)
+            props['steward_id'] = agency_id
             props['name'] = atr['TRAILNAME'].strip()
             props['motor_vehicles'] = 'no'
             props['foot'] = 'yes' if atr['HIKE'] == 'Yes' else 'No'
