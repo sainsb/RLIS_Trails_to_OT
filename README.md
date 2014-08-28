@@ -1,4 +1,4 @@
-RLIS_Trails_to_OT
+RLIS Trails to Open Trail Specification
 =================
 
 A python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.gov/?action=viewDetail&layerID=2404) to the [Open Trail specification](http://www.codeforamerica.org/specifications/trails/spec.html)
