@@ -18,10 +18,10 @@ wgs84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojso
 orsp = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
 if not os.path.exists(os.getcwd()+'/src'):
-    os.makedirs(directory)
+    os.makedirs(os.getcwd()+'/src')
 
 if not os.path.exists(os.getcwd()+'/output'):
-    os.makedirs(directory)
+    os.makedirs(os.getcwd()+'/output')
 
 #download it
 
@@ -154,7 +154,7 @@ for k, v in named_trails.iteritems():
     id = str(int(m[-7:], 16))
     uniqueness.append(id)
 
-    named_trails_out.write('"'+k.split('_')[0]+ '", "'+';'.join(v)+'", "'+id+'","", "'+k.split('_')[1]+'"\n')
+    named_trails_out.write('"'+k.split('_')[0]+ '","'+';'.join(v)+'","'+id+'","","'+k.split('_')[1]+'"\n')
     
 named_trails_out.close()
 
@@ -168,13 +168,13 @@ print "duplicate ids: " + str(dups)
 uniqueness = []
 
 stewards_out = open(os.getcwd() + "/output/stewards.csv", "w")
-stewards_out.write('"name", "id", "url", "phone", "address", "publisher", "license"\n')
+stewards_out.write('"name","id","url","phone","address","publisher","license"\n')
 
 for k, v in sorted(stewards.iteritems()):
     
     uniqueness.append(v)
 
-    stewards_out.write('"'+k+'", "'+v+'", "", "", "", "Oregon Metro - RLIS", "Open Commons Open Database License (ODbL) and Content License (DbCL)"\n')
+    stewards_out.write('"'+k+'","'+v+'","","","","Oregon Metro - RLIS","Open Commons Open Database License (ODbL) and Content License (DbCL)"\n')
 
 stewards_out.close()
 
