@@ -17,6 +17,12 @@ TRAILS_URL = 'http://library.oregonmetro.gov/rlisdiscovery/trails.zip'
 wgs84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 orsp = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
+if not os.path.exists(os.getcwd()+'/src'):
+    os.makedirs(directory)
+
+if not os.path.exists(os.getcwd()+'/output'):
+    os.makedirs(directory)
+
 #download it
 
 with open(os.getcwd()+'/src/trails.zip', 'wb') as handle:
