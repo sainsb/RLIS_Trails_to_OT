@@ -1,0 +1,3 @@
+pyproj==1.9.4
+pyshp==1.2.0
+requests==2.2.1
