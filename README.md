@@ -36,7 +36,7 @@ Instructions
 Disclaimers
 ==========
 
-*Does not include trailheads.geojson
+* Does not include trailheads.geojson
 * Does not include areas.geojson
 * **DO NOT HANG ANYTHING OFF OF THE NAMED_TRAIL.CSV IDs**
  * See [issue 1](https://github.com/sainsb/RLIS_Trails_to_OT/issues/1)
