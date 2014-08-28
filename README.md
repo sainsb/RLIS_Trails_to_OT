@@ -10,14 +10,14 @@ A python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.go
 Instructions
 ===========
 
-*Clone or download the zipped repository
-*install the requirements `pip install -r requirements.txt`
-*`>python RLISTRails2OT.py`
+* Clone or download the zipped repository
+* install the requirements `pip install -r requirements.txt`
+* `>python RLISTRails2OT.py`
 
 Disclaimers
 ==========
 
-We don't currently have a trailheads dataset
+* We don't currently have a trailheads dataset
 
 License
 =======
