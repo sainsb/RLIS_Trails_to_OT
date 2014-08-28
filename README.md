@@ -22,5 +22,5 @@ Disclaimers
 License
 =======
 
-[Open Database and Content License](http://opendatacommons.org/licenses/odbl/)
-[RLIS version](http://www.oregonmetro.gov/sites/default/files/Open_Database_and_Content_Licenses.pdf)
+* [Open Database and Content License](http://opendatacommons.org/licenses/odbl/)
+* [RLIS version](http://www.oregonmetro.gov/sites/default/files/Open_Database_and_Content_Licenses.pdf)
