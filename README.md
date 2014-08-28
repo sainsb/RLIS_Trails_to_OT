@@ -10,7 +10,6 @@ A python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.go
 In Brief
 ========
 Order of operations
-
 1. Download trails file from RLIS
 2. Unzip
 3. Read shapefile (into memory)
@@ -38,8 +37,6 @@ Disclaimers
 ==========
 
 * We don't currently have a trailheads dataset
-
-
 
 License
 =======
