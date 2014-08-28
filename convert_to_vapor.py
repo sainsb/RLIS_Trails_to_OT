@@ -22,15 +22,19 @@ reader = shapefile.Reader("d:/scratch/transit/trails.shp")
 fields = reader.fields[1:]
 field_names = [field[0] for field in fields]
 buffer = []
-conter=0
 
-agencies = {}
+stewards = {}
 named_trails = {}
 
+def get_duplicates(arr):
+    dup_arr = arr[:]
+    for i in set(arr):
+        dup_arr.remove(i)       
+    return list(set(dup_arr)) 
+
+
 for sr in reader.shapeRecords():
-
-    if conter < 100:
-
+    
         atr = dict(zip(field_names, sr.record))
 
         # we're only allowing open trails to pass
@@ -41,10 +45,10 @@ for sr in reader.shapeRecords():
             # In this way we can ensure that agencies get the same id each time
             # without having to maintain an agency id in house
 
-            if atr['AGENCYNAME'] not in agencies.iterkeys():
+            if atr['AGENCYNAME'] not in stewards.iterkeys():
                 m = hashlib.sha224(atr['AGENCYNAME']).hexdigest()
-                agency_id = str(int(m[-5:], 16))
-                agencies[atr['AGENCYNAME']] = agency_id
+                agency_id = str(int(m[-6:], 16))
+                stewards[atr['AGENCYNAME']] = agency_id
                 
                 """
                 t='Hillsboro Parks and Recreation'
@@ -82,7 +86,11 @@ for sr in reader.shapeRecords():
             trlname= atr['TRAILNAME'].strip()
             trlsys = atr['SYSTEMNAME'].strip()
 
-            trlname = 'Unnamed' if trlname == "" else trlname
+            if trlname.strip() == "":
+                if atr['SHAREDNAME'].strip() != "":
+                   trlname = atr['SHAREDNAME']
+                else:
+                   trlname = "Unnamed"
 
             if trlname+'_'+trlsys not in named_trails.iterkeys():
                 named_trails[trlname+'_'+trlsys] = [id]
@@ -90,7 +98,6 @@ for sr in reader.shapeRecords():
                 named_trails[trlname+'_'+trlsys].append(id)
 
             buffer.append(segment)
-            conter +=1
 
 # write the GeoJSON file
 from json import dumps
@@ -100,55 +107,38 @@ trail_segments.write(dumps({"type": "FeatureCollection",\
 trail_segments.close()
 
 named_trails_out = open(OUTPUT_PATH + "named_trails.csv", "w")
-named_trails_out.write("name", "segment_ids", "id", "description", "part_of\n")
+named_trails_out.write('"name", "segment_ids", "id", "description", "part_of"\n')
 
-for k, v in named_trails:
-    
+uniqueness = []
 
-    named_trails_out.write(k.split('_')[0], ';'.join(v), 
+for k, v in named_trails.iteritems():
+    m = hashlib.sha224(k).hexdigest()
+    id = str(int(m[-7:], 16))
+    uniqueness.append(id)
+
+    named_trails_out.write('"'+k.split('_')[0]+ '", "'+';'.join(v)+'", "'+id+'","", "'+k.split('_')[1]+'"\n')
     
+named_trails_out.close()
+
+#ensure no collisions
+# check named_trail_ids for dups
+dups = get_duplicates(uniqueness)
+print "dups: " + str(dups)
+
+uniqueness = []
+
+stewards_out = open(OUTPUT_PATH + "stewards.csv", "w")
+stewards_out.write('"name", "id", "url", "phone", "address", "publisher", "license"\n')
+
+for k, v in sorted(stewards.iteritems()):
+    
+    uniqueness.append(v)
+
+    stewards_out.write('"'+k+'", "'+v+'", "", "", "", "Oregon Metro - RLIS", "Open Commons Open Database License (ODbL) and Content License (DbCL)"\n')
+
+stewards_out.close()
+
+dups = get_duplicates(uniqueness)
+print "dups: " + str(dups)
 
 print 'done'
-"""
-{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "id": "01",
-        "steward_id": "1",
-        "name": "",
-        "motor_vehicles": "no",
-        "foot": "yes",
-        "bicycle": "no",
-        "horse": "no",
-        "ski": "no",
-        "wheelchair": "no",
-        "osm_tags": "surface=gravel; width=5"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            -105.26275634765625,
-            43.24320200099953
-          ],
-          [
-            -105.71319580078125,
-            43.42100882994726
-          ],
-          [
-            -105.71319580078125,
-            43.44100882994726
-          ],
-          [
-            -105.68319580078125,
-            43.44100882994726
-          ]
-        ]
-      }
-    },
-  ]
-}
-"""
