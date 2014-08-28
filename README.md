@@ -7,10 +7,20 @@ A python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.go
  * Does not require GDAL, shapely, arcpy etc.
 * Not web-based.
 
+In Brief
+========
+Order of operations
+# Download trails file from RLIS
+# Unzip
+# Read shapefile (into memory)
+# Create trails_segments.geojson
+# Create named_trails.csv
+# Create stewards.csv
+
 Dependencies
 ============
 If you have a compiler, you can run `pip install -r requirements.txt` but if not or you don't know,
-go snag these installables:
+go snag these installables for your correct platform and python version:
 
 * [pyshp](http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyshp)
 * [pyproj](http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyproj)
@@ -20,10 +30,8 @@ Instructions
 ===========
 
 * Clone or download the zipped repository
-
+* Satisfy dependencies (see above)
 * `>python RLISTRails2OT.py`
-
-
 
 Disclaimers
 ==========
