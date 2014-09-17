@@ -7,7 +7,6 @@
 # |       |     | | \  |  \  /  |______ |_____/ |______   |   |     | | \  |
 # |_____  |_____| |  \_|   \/   |______ |    \_ ______| __|__ |_____| |  \_|
 #                                                                           
-#                                             ...:bns wrecking crew rulez:...
 
 # http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyshp
 import shapefile
@@ -20,6 +19,8 @@ import requests
 
 import hashlib, collections, csv, os, sys, zipfile
 
+from json import dumps, loads
+
 # http://www.codeforamerica.org/specifications/trails/spec.html
 
 TRAILS_URL = 'http://library.oregonmetro.gov/rlisdiscovery/trails.zip'
@@ -28,10 +29,9 @@ ORCA_URL = 'http://library.oregonmetro.gov/rlisdiscovery/orca.zip'
 WGS84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 ORSP = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
-
 if not os.path.exists(os.getcwd()+'/output'):
     """
-    Create a directory to hold hte output
+    Create a directory to hold the output
     """
     os.makedirs(os.getcwd()+'/output')
 
@@ -72,19 +72,15 @@ def unzip(file):
         zfile.extract(name, os.getcwd()+'/src/')
     zfile.close()
 
-if __name__ == 'main':
+def process_trail_segments():
+    stewards = {}
+    named_trails = {}
+    trail_segments = []
 
-    download(TRAILS_URL, 'trails')
-    download(ORCA_URL, 'orca')
-
-    # read the trails shapefile
+     # read the trails shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/trails.shp')
     fields = reader.fields[1:]
     field_names = [field[0] for field in fields]
-
-    trail_segments = []
-    stewards = {}
-    named_trails = {}
 
     #iterate trails
     for sr in reader.shapeRecords():
@@ -97,23 +93,16 @@ if __name__ == 'main':
 
             # Hash the name and take the last six digits of the hex rep
             # In this way we can ensure that agencies get the same id each time
-            # without having to maintain an agency id in house
+            # without having to maintain an agency id in house.
+            # Caveat: If the agency name changes ever so slightly, we'll lose the id persistence
 
             if atr['AGENCYNAME'] not in stewards.iterkeys():
                 m = hashlib.sha224(atr['AGENCYNAME']).hexdigest()
                 agency_id = str(int(m[-6:], 16))
                 stewards[atr['AGENCYNAME']] = agency_id
-                
-                """
-                t='Hillsboro Parks and Recreation'
-                >>> m=hashlib.sha224(t).hexdigest()
-                'c33f51592f1d24ef759d695dc05602a265832bc1a55918da3228ed08'
-                >>> int(m[-5:], 16)
-                """
-            #Field massage
+            
             id = props['id'] = str(int(atr['TRAILID']))
             props['steward_id'] = stewards[atr['AGENCYNAME']]
-            #props['name'] = atr['TRAILNAME'].strip()
             props['motor_vehicles'] = 'no'
             props['foot'] = 'yes' if atr['HIKE'] == 'Yes' else 'No'
             props['bicycle'] = 'yes' if atr['ROADBIKE'] == 'Yes'\
@@ -126,8 +115,15 @@ if __name__ == 'main':
 
             props['osm_tags'] = 'surface='+atr['TRLSURFACE']+';width='+atr['WIDTH']
 
+            # Assumes single part geometry == our (RLIS) trails.shp
             n_geom = []
             geom = sr.shape.__geo_interface__
+
+
+            if geom['type'] !='LineString':
+                print 'Encountered multipart...skipping'
+                continue
+
             for point in geom['coordinates']:
                 n_geom.append(pyproj.transform(ORSP, WGS84, point[0], point[1]))
             
@@ -153,22 +149,41 @@ if __name__ == 'main':
             trail_segments.append(segment)
 
     #Release the trails shapefile
-    #reader = None
-    print ("Completed trails")
+    reader = None
 
+    print ("Completed trails")
+    return trail_segments, stewards, named_trails
+
+def process_areas(stewards):
     # read the parks shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/orca.shp')
     fields = reader.fields[1:]
     field_names = [field[0] for field in fields]
 
     areas = []
-
+    counter = 0
     for sr in reader.shapeRecords():
-    
+        if counter == 10000: break
         atr = dict(zip(field_names, sr.record))
 
-        #Horrid horribleness definition Query
-        if atr['COUNTY'] in ['Clackamas', 'Multnomah', 'Washington'] and (atr['OWNLEV1'] in ['Private', 'Non-Profits'] and (atr['UNITTYPE'] in ['Natural Area', 'Other'] and atr['RECREATION']=='Yes') or atr['CONSERVATI']=='High') or (atr['OWNLEV1'] not in ['Private', 'Non-Profits'] and (atr['UNITTYPE']== 'Other' and (atr['RECREATION']=='Yes' or atr['CONSERVATI'] in ['High', 'Medium']) or atr['UNITTYPE'] == 'Natural Area') ) or atr['OWNLEV2'] == 'Non-profit Conservation' or atr['UNITTYPE']== 'Park':
+        """
+        SELECT * 
+        FROM   orca 
+        WHERE  county IN ( 'Clackamas', 'Multnomah', 'Washington' ) 
+               AND ( ( ownlev1 IN ( 'Private', 'Non-Profits' ) 
+                       AND ( unittype IN ( 'Natural Area', 'Other' ) 
+                             AND recreation = 'Yes' ) 
+                        OR conservation = 'High' ) 
+                      OR ( ownlev1 NOT IN ( 'Private', 'Non-Profits' ) 
+                           AND ( unittype = 'Other' 
+                                 AND ( recreation = 'Yes' 
+                                        OR conservation IN ( 'High', 'Medium' ) ) 
+                                  OR unittype = 'Natural Area' ) ) 
+                      OR ( ownlev2 = 'Non-profit Conservation' ) 
+                      OR ( unittype = 'Park' ) ) 
+        """
+
+        if atr['COUNTY'] in ['Clackamas', 'Multnomah', 'Washington'] and ((atr['OWNLEV1'] in ['Private', 'Non-Profits'] and (atr['UNITTYPE'] in ['Natural Area', 'Other'] and atr['RECREATION']=='Yes') or atr['CONSERVATI']=='High') or (atr['OWNLEV1'] not in ['Private', 'Non-Profits'] and (atr['UNITTYPE']== 'Other' and (atr['RECREATION']=='Yes' or atr['CONSERVATI'] in ['High', 'Medium']) or atr['UNITTYPE'] == 'Natural Area') ) or atr['OWNLEV2'] == 'Non-profit Conservation' or atr['UNITTYPE']== 'Park'):
 
             props = collections.OrderedDict()
 
@@ -178,14 +193,27 @@ if __name__ == 'main':
                 stewards[atr['MANAGER']] = agency_id
 
             geom = sr.shape.__geo_interface__
-            rings = []
-            for ring in geom['coordinates']:
-                n_geom = []
-                for point in ring:
-                    n_geom.append(pyproj.transform(ORSP, WGS84, point[0], point[1]))
-                rings.append(n_geom)
 
-            rings = {"type":"Polygon", "coordinates":rings}
+            if geom['type'] == 'MultiPolygon':
+                polys=[]
+                for poly in geom['coordinates']:
+                    rings = []
+                    for ring in poly:
+                        n_geom = []
+                        for point in ring:
+                            n_geom.append(pyproj.transform(ORSP, WGS84, point[0], point[1]))
+                        rings.append(n_geom)
+                    polys.append(rings)
+
+                new_geom = {"type":"MultiPolygon", "coordinates":polys}
+            else:
+                rings = []
+                for ring in geom['coordinates']:
+                    n_geom = []
+                    for point in ring:
+                        n_geom.append(pyproj.transform(ORSP, WGS84, point[0], point[1]))
+                    rings.append(n_geom)
+                new_geom = {"type":"Polygon", "coordinates":rings}
 
             props['name'] = atr['SITENAME']
 
@@ -200,17 +228,28 @@ if __name__ == 'main':
             _area= collections.OrderedDict()
             _area['type']='Feature'
             _area['properties'] = props
-            _area['geometry'] = rings
+            _area['geometry'] = new_geom
 
             areas.append(_area)
+
+            counter +=1
     # free up the shp file.
     reader = None
 
+    return areas, stewards
+
+if __name__ == "__main__":
+
+    download(TRAILS_URL, 'trails')
+    download(ORCA_URL, 'orca')
+
+    trail_segments, stewards, named_trails = process_trail_segments()
+
+    areas, stewards = process_areas(stewards)
 
     ######################################################
     # write trail_segments.geojson
     #
-    from json import dumps, loads
     trail_segments_out = open(os.getcwd() + "/output/trail_segments.geojson", "w")
     trail_segments_out.write(dumps({"type": "FeatureCollection",\
     "features": trail_segments}, indent=2) + "\n")
@@ -220,15 +259,12 @@ if __name__ == 'main':
     #
     ######################################################
 
+
     ######################################################
-    # write trail_names.csv
+    # write named_trails.csv
     #
     named_trails_out = open(os.getcwd() + "/output/named_trails.csv", "w")
     named_trails_out.write('"name", "segment_ids", "id", "description", "part_of"\n')
-
-    #
-    ########################################################
-
 
     uniqueness = []
 
@@ -241,13 +277,17 @@ if __name__ == 'main':
     
     named_trails_out.close()
 
+    # simple check named_trail.id for dups to ensure no collisions
+    print "duplicate ids: " + str(get_duplicates(uniqueness))
+
     print 'Created named_trails.csv'
+    #
+    ########################################################
 
-    # simple check to ensure no collisions
-    # check named_trail_ids for dups
-    dups = get_duplicates(uniqueness)
-    print "duplicate ids: " + str(dups)
 
+    ########################################################
+    # write stewards.csv
+    #
     uniqueness = []
 
     # load in the /data/stewards.json file 
@@ -270,14 +310,24 @@ if __name__ == 'main':
 
     stewards_out.close()
 
+    # simple check stewards.id for dups to ensure no collisions
+    print "duplicate ids: " + str(get_duplicates(uniqueness))
+
     print 'Created stewards.csv'
+    #
+    ######################################################
 
-    dups = get_duplicates(uniqueness)
-    print "duplicate ids: " + str(dups)
 
+    ########################################################
+    # write areas.geojson
+    #
     areas_out = open(os.getcwd()+"/output/areas.geojson", "w")
     areas_out.write(dumps({"type": "FeatureCollection",\
     "features": areas}, indent=2) + "\n")
     areas_out.close()
 
-    print 'done'
+    print 'Created areas.geojson'
+    #
+    ######################################################
+
+    print 'Process complete'
