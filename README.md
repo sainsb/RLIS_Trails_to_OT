@@ -1,7 +1,7 @@
 RLIS Trails to Open Trail Specification
 =================
 
-A python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.gov/?action=viewDetail&layerID=2404) to the [Open Trail specification](http://www.codeforamerica.org/specifications/trails/spec.html)
+A working python conversion script for [RLIS Trails](http://rlisdiscovery.oregonmetro.gov/?action=viewDetail&layerID=2404) to the [Open Trail specification](http://www.codeforamerica.org/specifications/trails/spec.html)
 
 * Aims to be lean on dependencies.
  * Does not require GDAL, shapely, arcpy etc.
@@ -36,7 +36,10 @@ Instructions
 Disclaimers
 ==========
 
-* We don't currently have a trailheads dataset
+* Does not include trailheads.geojson
+* Does not include areas.geojson
+* **DO NOT HANG ANYTHING OFF OF THE NAMED_TRAIL.CSV IDs**
+ * See [issue 1](https://github.com/sainsb/RLIS_Trails_to_OT/issues/1)
 
 License
 =======
