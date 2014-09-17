@@ -1,0 +1,14 @@
+{
+  "name": "RLIS_To_OT_tests",
+  "version": "1.0.0",
+  "description": "Tests for the output from the conversion process",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "geojsonhint": "^0.3.4"
+  }
+}
