@@ -16,6 +16,7 @@ Order of operations
 4. Create trails_segments.geojson
 5. Create named_trails.csv
 6. Create stewards.csv
+7. Create areas.geojson
 
 Dependencies
 ============
