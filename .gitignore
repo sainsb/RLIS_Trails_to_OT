@@ -9,6 +9,7 @@ __pycache__/
 .Python
 env/
 src/
+output/
 bin/
 build/
 develop-eggs/
