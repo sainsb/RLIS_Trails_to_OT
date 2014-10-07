@@ -10,6 +10,7 @@ A working python conversion script for [RLIS Trails](http://rlisdiscovery.oregon
 In Brief
 ========
 Order of operations
+
 1. Download trails file from RLIS
 2. Unzip
 3. Read shapefile (into memory)
