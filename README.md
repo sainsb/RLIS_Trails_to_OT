@@ -10,12 +10,14 @@ A working python conversion script for [RLIS Trails](http://rlisdiscovery.oregon
 In Brief
 ========
 Order of operations
+
 1. Download trails file from RLIS
 2. Unzip
 3. Read shapefile (into memory)
 4. Create trails_segments.geojson
 5. Create named_trails.csv
 6. Create stewards.csv
+7. Create areas.geojson
 
 Dependencies
 ============
