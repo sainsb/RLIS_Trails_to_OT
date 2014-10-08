@@ -167,6 +167,9 @@ def process_areas(stewards):
         if counter == 10000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
         atr = dict(zip(field_names, sr.record))
 
+        if atr['STATUS'] == 'Closed': #We don't want any closed sites to show up.
+            continue
+
         """
         SELECT * 
         FROM   orca 
