@@ -77,7 +77,7 @@ def process_trail_segments():
     named_trails = {}
     trail_segments = []
 
-     # read the trails shapefile
+    # read the trails shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/trails.shp')
     fields = reader.fields[1:]
     field_names = [field[0] for field in fields]
@@ -91,7 +91,7 @@ def process_trail_segments():
         if atr['STATUS'].upper() == 'OPEN':
             props = collections.OrderedDict()
 
-            # Hash the name and take the last six digits of the hex rep
+            # Hash the name and take the last six digits of the hex string
             # In this way we can ensure that agencies get the same id each time
             # without having to maintain an agency id in house.
             # Caveat: If the agency name changes ever so slightly, we'll lose the id persistence
@@ -119,7 +119,6 @@ def process_trail_segments():
             n_geom = []
             geom = sr.shape.__geo_interface__
 
-
             if geom['type'] !='LineString':
                 print 'Encountered multipart...skipping'
                 continue
@@ -132,9 +131,11 @@ def process_trail_segments():
             segment['properties'] = props
             segment['geometry'] = {"type":"LineString", "coordinates":n_geom}
 
+            # Establish parameters for named_trail.csv construction
             trlname= atr['TRAILNAME'].strip()
             trlsys = atr['SYSTEMNAME'].strip()
 
+            #Trail name can fail to sharedname else unnamed.
             if trlname.strip() == "":
                 if atr['SHAREDNAME'].strip() != "":
                     trlname = atr['SHAREDNAME']
@@ -163,7 +164,7 @@ def process_areas(stewards):
     areas = []
     counter = 0
     for sr in reader.shapeRecords():
-        if counter == 10000: break
+        if counter == 10000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
         atr = dict(zip(field_names, sr.record))
 
         """
@@ -240,12 +241,22 @@ def process_areas(stewards):
 
 if __name__ == "__main__":
 
+    #####################################################
+    # Download data from RLIS
+    #
     download(TRAILS_URL, 'trails')
     download(ORCA_URL, 'orca')
+    #
+    #####################################################
 
+    #####################################################
+    # Load objects and arrays with calls to core functions
+    #
     trail_segments, stewards, named_trails = process_trail_segments()
-
+    
     areas, stewards = process_areas(stewards)
+    #
+    ######################################################
 
     ######################################################
     # write trail_segments.geojson
@@ -259,12 +270,11 @@ if __name__ == "__main__":
     #
     ######################################################
 
-
     ######################################################
     # write named_trails.csv
     #
     named_trails_out = open(os.getcwd() + "/output/named_trails.csv", "w")
-    named_trails_out.write('"name", "segment_ids", "id", "description", "part_of"\n')
+    named_trails_out.write('"name","segment_ids","id","description","part_of"\n')
 
     uniqueness = []
 
@@ -277,7 +287,7 @@ if __name__ == "__main__":
     
     named_trails_out.close()
 
-    # simple check named_trail.id for dups to ensure no collisions
+    # simple check: named_trail.id for dups to ensure no collisions
     print "duplicate ids: " + str(get_duplicates(uniqueness))
 
     print 'Created named_trails.csv'
