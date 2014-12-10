@@ -88,7 +88,7 @@ def process_trail_segments():
         atr = dict(zip(field_names, sr.record))
 
         # we're only allowing open existing trails to pass
-        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OPEN':
+        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OTHER':
             props = collections.OrderedDict()
 
             # Hash the name and take the last six digits of the hex string
