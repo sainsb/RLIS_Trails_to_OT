@@ -19,7 +19,7 @@ import requests
 
 import hashlib, collections, csv, os, sys, zipfile
 
-from json import dumps, loads
+import json
 
 # http://www.codeforamerica.org/specifications/trails/spec.html
 
@@ -73,7 +73,7 @@ def unzip(file):
     zfile.close()
 
 def process_trail_segments():
-    stewards = {}
+
     named_trails = {}
 
     # read the trails shapefile
@@ -87,7 +87,7 @@ def process_trail_segments():
         atr = dict(zip(field_names, sr.record))
 
         # we're only allowing open existing trails to pass
-        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OTHER'        and atr['TRLSURFACE'] != 'Water':
+        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OTHER' and atr['TRLSURFACE'] != 'Water':
             props = collections.OrderedDict()
 
             #effectively join to the stewards table
@@ -124,10 +124,10 @@ def process_trail_segments():
 
             if atr['trailname'] != None:
               try:
-                named_trails[atr['trailname']].append(atr['trailid'])
+                named_trails[atr['trailname']+'|'+atr['county']].append(atr['trailid'])
               except:
-                named_trails[atr['trailname']] = []
-                named_trails[atr['trailname']].append(atr['trailid'])
+                named_trails[atr['trailname']+'|'+atr['county']] = []
+                named_trails[atr['trailname']+'|'+atr['county']].append(atr['trailid'])
 
             if atr['systemname'] != None:
               try:
@@ -245,8 +245,20 @@ if __name__ == "__main__":
     #####################################################
     # Download data from RLIS
     #
-    download(TRAILS_URL, 'trails')
-    download(ORCA_URL, 'orca')
+    #download(TRAILS_URL, 'trails')
+    #download(ORCA_URL, 'orca')
+    #
+    #####################################################
+
+
+    #####################################################
+    # Load Stewards into Python object
+    #
+    json_data=open(os.getcwd() + "/ref/stewards.json")
+    stewards = json.load(json_data)
+    print stewards[0:5]
+    sys.exit()
+    #
     #
     #####################################################
 
@@ -294,7 +306,6 @@ if __name__ == "__main__":
     print 'Created named_trails.csv'
     #
     ########################################################
-
 
     ########################################################
     # write stewards.csv
