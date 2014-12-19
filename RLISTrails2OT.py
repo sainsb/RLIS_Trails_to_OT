@@ -75,7 +75,6 @@ def unzip(file):
 def process_trail_segments():
     stewards = {}
     named_trails = {}
-    trail_segments = []
 
     # read the trails shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/trails.shp')
@@ -88,18 +87,10 @@ def process_trail_segments():
         atr = dict(zip(field_names, sr.record))
 
         # we're only allowing open existing trails to pass
-        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OTHER':
+        if atr['STATUS'].upper() == 'OPEN' and atr['SYSTEMTYPE'].upper() != 'OTHER'        and atr['TRLSURFACE'] != 'Water':
             props = collections.OrderedDict()
 
-            # Hash the name and take the last six digits of the hex string
-            # In this way we can ensure that agencies get the same id each time
-            # without having to maintain an agency id in house.
-            # Caveat: If the agency name changes ever so slightly, we'll lose the id persistence
-
-            if atr['AGENCYNAME'] not in stewards.iterkeys():
-                m = hashlib.sha224(atr['AGENCYNAME']).hexdigest()
-                agency_id = str(int(m[-6:], 16))
-                stewards[atr['AGENCYNAME']] = agency_id
+            #effectively join to the stewards table
             
             id = props['id'] = str(int(atr['TRAILID']))
             props['steward_id'] = stewards[atr['AGENCYNAME']]
@@ -131,26 +122,33 @@ def process_trail_segments():
             segment['properties'] = props
             segment['geometry'] = {"type":"LineString", "coordinates":n_geom}
 
-            # Establish parameters for named_trail.csv construction
-            trlname= atr['TRAILNAME'].strip()
-            trlsys = atr['SYSTEMNAME'].strip()
+            if atr['trailname'] != None:
+              try:
+                named_trails[atr['trailname']].append(atr['trailid'])
+              except:
+                named_trails[atr['trailname']] = []
+                named_trails[atr['trailname']].append(atr['trailid'])
 
-            #Trail name can fail to sharedname else unnamed.
-            if trlname.strip() == "":
-                if atr['SHAREDNAME'].strip() != "":
-                    trlname = atr['SHAREDNAME']
-                else:
-                    trlname = "Unnamed"
+            if atr['systemname'] != None:
+              try:
+                named_trails[atr['systemname']].append(atr['trailid'])
+              except:             
+                named_trails[atr['systemname']] = []
+                named_trails[atr['systemname']].append(atr['trailid'])
 
-            if trlname+'_'+trlsys not in named_trails.iterkeys():
-                named_trails[trlname+'_'+trlsys] = [id]
-            else:
-                named_trails[trlname+'_'+trlsys].append(id)
+            if atr['sharedname'] != None:
+              try:
+                named_trails[atr['sharedname']].append(atr['trailid'])
+              except:             
+                named_trails[atr['sharedname']] = []
+                named_trails[atr['sharedname']].append(atr['trailid'])
 
             trail_segments.append(segment)
 
     #Release the trails shapefile
     reader = None
+
+    #remove duplicate entries in named_trails
 
     print ("Completed trails")
     return trail_segments, stewards, named_trails
