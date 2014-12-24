@@ -21,6 +21,8 @@ import hashlib, collections, csv, os, sys, zipfile
 
 import json
 
+import csv
+
 # http://www.codeforamerica.org/specifications/trails/spec.html
 
 TRAILS_URL = 'http://library.oregonmetro.gov/rlisdiscovery/trails.zip'
@@ -28,6 +30,8 @@ ORCA_URL = 'http://library.oregonmetro.gov/rlisdiscovery/orca.zip'
 
 WGS84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 ORSP = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
+
+STEWARDS = []
 
 if not os.path.exists(os.getcwd()+'/output'):
     """
@@ -72,9 +76,39 @@ def unzip(file):
         zfile.extract(name, os.getcwd()+'/src/')
     zfile.close()
 
-def process_trail_segments():
+def get_steward_id(steward):
+    try:
+      id = [x['steward_id'] for x in STEWARDS if x["name"] == steward][0]
+      return id
+    except IndexError as e:
+        #Crap stewards
+        if steward=='Home Owner Association': return 9999 #private
+        if steward=='North Clackamas Parks and Recreation Department': return 58672 #should be district
+        if steward=='United States Fish & Wildlife' : return 43262
+        if steward=='Wood Village Parks & Recreation' : return 8348
+        if steward is None: return 9999 #private
+        return 9999
 
-    named_trails = {}
+def compare_segment_arrays(a, b):
+  if len(a) != len(b): return False
+  for n in a:
+    if n in b:
+      continue
+    else:
+      return False
+  return True
+
+def is_subset(a,b):
+  for val in a:
+    if val in b:
+      continue
+    else:
+      return False
+  return True
+
+def process_trail_segments():
+    trail_segments = []
+    named_trails = []
 
     # read the trails shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/trails.shp')
@@ -91,9 +125,8 @@ def process_trail_segments():
             props = collections.OrderedDict()
 
             #effectively join to the stewards table
-            
             id = props['id'] = str(int(atr['TRAILID']))
-            props['steward_id'] = stewards[atr['AGENCYNAME']]
+            props['steward_id'] = get_steward_id(atr['AGENCYNAME'])
             props['motor_vehicles'] = 'no'
             props['foot'] = 'yes' if atr['HIKE'] == 'Yes' else 'No'
             props['bicycle'] = 'yes' if atr['ROADBIKE'] == 'Yes'\
@@ -122,36 +155,100 @@ def process_trail_segments():
             segment['properties'] = props
             segment['geometry'] = {"type":"LineString", "coordinates":n_geom}
 
-            if atr['trailname'] != None:
-              try:
-                named_trails[atr['trailname']+'|'+atr['county']].append(atr['trailid'])
-              except:
-                named_trails[atr['trailname']+'|'+atr['county']] = []
-                named_trails[atr['trailname']+'|'+atr['county']].append(atr['trailid'])
-
-            if atr['systemname'] != None:
-              try:
-                named_trails[atr['systemname']].append(atr['trailid'])
-              except:             
-                named_trails[atr['systemname']] = []
-                named_trails[atr['systemname']].append(atr['trailid'])
-
-            if atr['sharedname'] != None:
-              try:
-                named_trails[atr['sharedname']].append(atr['trailid'])
-              except:             
-                named_trails[atr['sharedname']] = []
-                named_trails[atr['sharedname']].append(atr['trailid'])
-
             trail_segments.append(segment)
 
+            if atr['TRAILNAME'] != None and '   ' not in atr['TRAILNAME']:
+              if len([x for x in named_trails if x["atomic_name"]==atr['TRAILNAME']+'|'+atr['COUNTY']])==0:
+                named_trails.append({'atomic_name': atr['TRAILNAME']+'|'+atr['COUNTY'], 'name':atr['TRAILNAME'],'segment_ids':[atr['TRAILID']]})
+              else:
+                [x for x in named_trails if x["atomic_name"]==atr['TRAILNAME']+'|'+atr['COUNTY']][0]['segment_ids'].append(atr['TRAILID'])
+             
+            if atr['SYSTEMNAME'] != None and '   ' not in atr['SYSTEMNAME']:
+              if len([x for x in named_trails if x['atomic_name']==atr['SYSTEMNAME']])==0:
+                named_trails.append({'atomic_name': atr['SYSTEMNAME'], 'name':atr['SYSTEMNAME'],'segment_ids':[atr['TRAILID']]})
+              else:
+                [x for x in named_trails if x["atomic_name"]==atr['SYSTEMNAME']][0]['segment_ids'].append(atr['TRAILID'])
+
+            if atr['SHAREDNAME'] != None and '   ' not in atr['SHAREDNAME']:
+              if len([x for x in named_trails if x['atomic_name']==atr['SHAREDNAME']])==0:
+                named_trails.append({'atomic_name': atr['SHAREDNAME'], 'name':atr['SHAREDNAME'],'segment_ids':[atr['TRAILID']]})
+              else:
+                [x for x in named_trails if x["atomic_name"]==atr['SHAREDNAME']][0]['segment_ids'].append(atr['TRAILID'])
+
     #Release the trails shapefile
+
     reader = None
 
-    #remove duplicate entries in named_trails
+    #step 1
+    #remove duplicate geometries in named_trails
+    all_arrays = []
+    for trail in named_trails: all_arrays.append(trail['segment_ids'])
+
+    #identify duplicate geometries
+    duplicates = [x for x in named_trails if len([y for y in all_arrays if compare_segment_arrays(x['segment_ids'],y)])>1]
+ 
+    glob_segs = None
+    #determine which to remove
+    counter = 0
+    for dup in duplicates:
+      if glob_segs is None or not compare_segment_arrays(dup['segment_ids'],glob_segs):
+    
+        #find ur buddy
+        d = [x for x in duplicates if compare_segment_arrays(x['segment_ids'],dup['segment_ids'])]
+        glob_segs = dup['segment_ids']
+
+        to_remove = [x for x in d if '|' in x['atomic_name']]
+
+        if len(to_remove) == 1:
+          named_trails.remove(to_remove[0])
+        else:
+          print 'no piped atomic name... I dunno'
+    
+    #step 2 - remove atomically stored trails that are pure 
+    # subsets of a regional trail superset
+    glob_name = None
+    for trail in named_trails:
+      if glob_name is None or trail['name'] != glob_name:
+        dups = [x for x in named_trails if x['name']==trail['name']]
+        glob_name = trail['name']
+    
+        #determine the dup with the most segs *heinous*
+        superset = max(enumerate(dups), key = lambda tup: len(tup[1]['segment_ids']))
+        superitem = [x for x in dups if x==superset[1]][0]
+
+        for dup in dups:
+          if len(dup['segment_ids']) != len(superitem['segment_ids']):
+            foo =is_subset(dup['segment_ids'], superitem['segment_ids'])
+            if foo and '|' in dup['atomic_name']:
+              print 'Removed '+dup['atomic_name'] + ' from named_trails'
+              named_trails.remove(dup)
+        glob_name = trail['name']
+
+    #step 3 - assign named trail id from reference table
+    for trail in named_trails:
+      if '|' in trail['atomic_name']:
+        county = trail['atomic_name'].split('|')[1].strip()
+        name =  trail['atomic_name'].split('|')[0].strip()
+      
+      else: #don't need the county == blank
+        name = trail['atomic_name']
+        county = ''
+
+      id= [x for x in NAMED_TRAIL_IDS if x[1]==county and x[2]==name]
+      if len(id)==0:
+        print name+' || '+ county
+
+      [x for x in named_trails if x['atomic_name']==trail['atomic_name']][0]['named_trail_id'] = id
+
+    #step 4 - remove atomic name
+    
+    for n in named_trails:
+      n.pop('atomic_name')
+
 
     print ("Completed trails")
-    return trail_segments, stewards, named_trails
+
+    return trail_segments, named_trails
 
 def process_areas(stewards):
     # read the parks shapefile
@@ -250,23 +347,54 @@ if __name__ == "__main__":
     #
     #####################################################
 
-
     #####################################################
     # Load Stewards into Python object
     #
-    json_data=open(os.getcwd() + "/ref/stewards.json")
-    stewards = json.load(json_data)
-    print stewards[0:5]
-    sys.exit()
+    with open(os.getcwd() + "/ref/stewards.csv", mode='r') as infile:
+      reader = csv.DictReader(infile, ['steward_id', 'name', 'url', 'phone', 'address','publisher', 'license']) #stewards.csv header
+      reader.next()
+      for row in reader:
+        STEWARDS.append(row)
+      for row in STEWARDS:
+        row['steward_id'] = int(row['steward_id'])
+
     #
     #
     #####################################################
+
+    #####################################################
+    # Load Named Trails into Python object
+    #
+    with open(os.getcwd() + "/ref/named_trails.csv", mode='r') as infile:
+      reader = csv.reader(infile)
+      reader.next() #skip header line
+      NAMED_TRAIL_IDS = list(reader)
+      for row in NAMED_TRAIL_IDS:
+        row[0] = int(row[0])
+
+    #
+    #
+    #####################################################
+
+
+    #####################################################
+    # Load 
 
     #####################################################
     # Load objects and arrays with calls to core functions
     #
-    trail_segments, stewards, named_trails = process_trail_segments()
-    
+    trail_segments, named_trails = process_trail_segments()
+     
+
+
+
+          #now check and see if one is a total super/pure subset of the other
+
+    #Assign named_trail ID
+
+    print yay+1
+    sys.exit()
+
     areas, stewards = process_areas(stewards)
     #
     ######################################################
