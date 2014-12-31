@@ -99,12 +99,14 @@ def compare_segment_arrays(a, b):
   return True
 
 def is_subset(a,b):
+  foo=True
   for val in a:
     if val in b:
       continue
     else:
-      return False
-  return True
+      #print val
+      foo= False
+  return foo
 
 def process_trail_segments():
     trail_segments = []
@@ -189,6 +191,7 @@ def process_trail_segments():
  
     glob_segs = None
     #determine which to remove
+
     counter = 0
     for dup in duplicates:
       if glob_segs is None or not compare_segment_arrays(dup['segment_ids'],glob_segs):
@@ -204,7 +207,7 @@ def process_trail_segments():
         else:
           print 'no piped atomic name... I dunno'
     
-    #step 2 - remove atomically stored trails that are pure 
+    #step 2 - remove atomically stored trails (with county) that are pure 
     # subsets of a regional trail superset
     glob_name = None
     for trail in named_trails:
@@ -224,7 +227,34 @@ def process_trail_segments():
               named_trails.remove(dup)
         glob_name = trail['name']
 
-    #step 3 - assign named trail id from reference table
+    #step 3 - remove atomically stored trails (with county) that are
+    # *impure* subsets of a regional trail superset
+    #this sucks
+    #So let's look for where the name matches the atomic name of an existing
+    #named trail - the assumption being that the atomic name of a regional
+    #trail will not include the pipe '|' and county
+    to_delete=[]
+
+    for trail in named_trails:
+      if '|' in trail['atomic_name']:
+        for test_trail in named_trails:
+          if trail['name'] == test_trail['atomic_name']:
+            print trail['name'] + ' combined with regional trail'
+            #Insert whatever segments in trail that aren't in 
+            #test_trail
+
+            for segment in trail['segment_ids']:
+              if segment not in test_trail['segment_ids']:
+                test_trail['segment_ids'].append(segment)
+
+            #append to to_delete
+            to_delete.append(trail)
+
+    #delete
+    for trail in to_delete:
+      named_trails.remove(trail)
+
+    #step 4 - assign named trail id from reference table
     for trail in named_trails:
       if '|' in trail['atomic_name']:
         county = trail['atomic_name'].split('|')[1].strip()
@@ -236,15 +266,14 @@ def process_trail_segments():
 
       id= [x for x in NAMED_TRAIL_IDS if x[1]==county and x[2]==name]
       if len(id)==0:
-        print name+' || '+ county
+        print '*' +name+' || '+ county
+      else:
+        [x for x in named_trails if x['atomic_name']==trail['atomic_name']][0]['named_trail_id'] = id[0]
 
-      [x for x in named_trails if x['atomic_name']==trail['atomic_name']][0]['named_trail_id'] = id
-
-    #step 4 - remove atomic name
+    #step 5 - remove atomic name
     
-    for n in named_trails:
-      n.pop('atomic_name')
-
+    #for n in named_trails:
+    #  n.pop('atomic_name')
 
     print ("Completed trails")
 
@@ -357,7 +386,7 @@ if __name__ == "__main__":
         STEWARDS.append(row)
       for row in STEWARDS:
         row['steward_id'] = int(row['steward_id'])
-
+    print "sucked up stewards"
     #
     #
     #####################################################
@@ -371,7 +400,7 @@ if __name__ == "__main__":
       NAMED_TRAIL_IDS = list(reader)
       for row in NAMED_TRAIL_IDS:
         row[0] = int(row[0])
-
+    print "Sucked up Named trail ids"
     #
     #
     #####################################################
