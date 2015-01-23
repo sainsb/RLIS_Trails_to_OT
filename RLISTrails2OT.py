@@ -190,7 +190,6 @@ def process_trail_segments():
     duplicates = [x for x in named_trails if len([y for y in all_arrays if compare_segment_arrays(x['segment_ids'],y)])>1]
  
     glob_segs = None
-    #determine which to remove
 
     counter = 0
     for dup in duplicates:
@@ -272,8 +271,8 @@ def process_trail_segments():
 
     #step 5 - remove atomic name
     
-    #for n in named_trails:
-    #  n.pop('atomic_name')
+    for n in named_trails:
+      n.pop('atomic_name')
 
     print ("Completed trails")
 
@@ -281,7 +280,7 @@ def process_trail_segments():
 
 def process_areas(stewards):
     # read the parks shapefile
-    reader = shapefile.Reader(os.getcwd()+'/src/orca.shp')
+    reader = shapefile.Reader(os.getcwd()+'/src/orca.shp') #this is actually ORCA_sites_beta
     fields = reader.fields[1:]
     field_names = [field[0] for field in fields]
 
@@ -394,7 +393,7 @@ if __name__ == "__main__":
     #####################################################
     # Load Named Trails into Python object
     #
-    with open(os.getcwd() + "/ref/named_trails.csv", mode='r') as infile:
+    with open(os.getcwd() + "/ref/named_trails_lookup.csv", mode='r') as infile:
       reader = csv.reader(infile)
       reader.next() #skip header line
       NAMED_TRAIL_IDS = list(reader)
@@ -413,16 +412,6 @@ if __name__ == "__main__":
     # Load objects and arrays with calls to core functions
     #
     trail_segments, named_trails = process_trail_segments()
-     
-
-
-
-          #now check and see if one is a total super/pure subset of the other
-
-    #Assign named_trail ID
-
-    print yay+1
-    sys.exit()
 
     areas, stewards = process_areas(stewards)
     #
