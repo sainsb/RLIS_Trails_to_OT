@@ -19,7 +19,7 @@ import requests
 
 import hashlib, collections, csv, os, sys, zipfile
 
-import json
+from json import dumps
 
 import csv
 
@@ -192,7 +192,7 @@ def process_trail_segments():
     glob_segs = None
 
     counter = 0
-    for dup in duplicates:
+    for dup in duplicates:  
       if glob_segs is None or not compare_segment_arrays(dup['segment_ids'],glob_segs):
     
         #find ur buddy
@@ -222,7 +222,7 @@ def process_trail_segments():
           if len(dup['segment_ids']) != len(superitem['segment_ids']):
             foo =is_subset(dup['segment_ids'], superitem['segment_ids'])
             if foo and '|' in dup['atomic_name']:
-              print 'Removed '+dup['atomic_name'] + ' from named_trails'
+              #print 'Removed '+dup['atomic_name'] + ' from named_trails'
               named_trails.remove(dup)
         glob_name = trail['name']
 
@@ -238,7 +238,7 @@ def process_trail_segments():
       if '|' in trail['atomic_name']:
         for test_trail in named_trails:
           if trail['name'] == test_trail['atomic_name']:
-            print trail['name'] + ' combined with regional trail'
+            #print trail['name'] + ' combined with regional trail'
             #Insert whatever segments in trail that aren't in 
             #test_trail
 
@@ -413,7 +413,22 @@ if __name__ == "__main__":
     #
     trail_segments, named_trails = process_trail_segments()
 
-    areas, stewards = process_areas(stewards)
+    ######################################################
+    # write named_trails.csv
+    #
+    named_trails_out = open(os.getcwd() + "/output/named_trails.csv", "w")
+    named_trails_out.write('"name","segment_ids","id","description","part_of"\n')
+    
+    for named_trail in named_trails:
+
+      named_trails_out.write(named_trail['name']+","+ ";".join(str(x) for x in named_trail['segment_ids'])+","+ str(named_trail['named_trail_id'][0]) + ",,\n")
+
+    named_trails_out.close()
+
+    print 'Created named_trails.csv'
+    #
+    ########################################################
+
     #
     ######################################################
 
@@ -429,34 +444,10 @@ if __name__ == "__main__":
     #
     ######################################################
 
-    ######################################################
-    # write named_trails.csv
-    #
-    named_trails_out = open(os.getcwd() + "/output/named_trails.csv", "w")
-    named_trails_out.write('"name","segment_ids","id","description","part_of"\n')
-
-    uniqueness = []
-
-    for k, v in named_trails.iteritems():
-        m = hashlib.sha224(k).hexdigest()
-        id = str(int(m[-7:], 16))
-        uniqueness.append(id)
-
-        named_trails_out.write('"'+k.split('_')[0]+ '","'+';'.join(v)+'","'+id+'","","'+k.split('_')[1]+'"\n')
-    
-    named_trails_out.close()
-
-    # simple check: named_trail.id for dups to ensure no collisions
-    print "duplicate ids: " + str(get_duplicates(uniqueness))
-
-    print 'Created named_trails.csv'
-    #
-    ########################################################
 
     ########################################################
     # write stewards.csv
     #
-    uniqueness = []
 
     # load in the /data/stewards.json file 
     # in order to lookup the address, url and phone.
@@ -485,6 +476,7 @@ if __name__ == "__main__":
     #
     ######################################################
 
+    areas, stewards = process_areas(stewards)
 
     ########################################################
     # write areas.geojson
