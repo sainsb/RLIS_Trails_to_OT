@@ -19,14 +19,13 @@ import requests
 
 import hashlib, collections, csv, os, sys, zipfile
 
-from json import dumps
+import json
 
 import csv
 
 # http://www.codeforamerica.org/specifications/trails/spec.html
 
 TRAILS_URL = 'http://library.oregonmetro.gov/rlisdiscovery/trails.zip'
-ORCA_URL = 'http://library.oregonmetro.gov/rlisdiscovery/orca.zip'
 
 WGS84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojson
 ORSP = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
@@ -264,13 +263,13 @@ def process_trail_segments():
         county = ''
 
       id= [x for x in NAMED_TRAIL_IDS if x[1]==county and x[2]==name]
+
       if len(id)==0:
-        print '*' +name+' || '+ county
+        print '*' +name+' || '+ county # no id in named_trails
       else:
         [x for x in named_trails if x['atomic_name']==trail['atomic_name']][0]['named_trail_id'] = id[0]
 
     #step 5 - remove atomic name
-    
     for n in named_trails:
       n.pop('atomic_name')
 
@@ -278,7 +277,7 @@ def process_trail_segments():
 
     return trail_segments, named_trails
 
-def process_areas(stewards):
+def process_areas():
     # read the parks shapefile
     reader = shapefile.Reader(os.getcwd()+'/src/orca.shp') #this is actually ORCA_sites_beta
     fields = reader.fields[1:]
@@ -344,11 +343,8 @@ def process_areas(stewards):
 
             props['name'] = atr['SITENAME']
 
-            m = hashlib.sha224(atr['SITENAME']+atr['MANAGER']).hexdigest()
-            orca_id = str(int(m[-6:], 16))
-
-            props['id'] = orca_id
-            props['steward_id'] = stewards[atr['MANAGER']]
+            props['id'] = atr['DISSOLVE_ID']
+            props['steward_id'] = STEWARDS[atr['MANAGER']]
             props['url'] = ''
             props['osm_tags'] = ''
 
@@ -363,14 +359,14 @@ def process_areas(stewards):
     # free up the shp file.
     reader = None
 
-    return areas, stewards
+    return areas
 
 if __name__ == "__main__":
 
     #####################################################
     # Download data from RLIS
     #
-    #download(TRAILS_URL, 'trails')
+    download(TRAILS_URL, 'trails')
     #download(ORCA_URL, 'orca')
     #
     #####################################################
@@ -378,7 +374,7 @@ if __name__ == "__main__":
     #####################################################
     # Load Stewards into Python object
     #
-    with open(os.getcwd() + "/ref/stewards.csv", mode='r') as infile:
+    with open(os.getcwd() + "/output/stewards.csv", mode='r') as infile:
       reader = csv.DictReader(infile, ['steward_id', 'name', 'url', 'phone', 'address','publisher', 'license']) #stewards.csv header
       reader.next()
       for row in reader:
@@ -404,7 +400,6 @@ if __name__ == "__main__":
     #
     #####################################################
 
-
     #####################################################
     # Load 
 
@@ -420,8 +415,11 @@ if __name__ == "__main__":
     named_trails_out.write('"name","segment_ids","id","description","part_of"\n')
     
     for named_trail in named_trails:
-
-      named_trails_out.write(named_trail['name']+","+ ";".join(str(x) for x in named_trail['segment_ids'])+","+ str(named_trail['named_trail_id'][0]) + ",,\n")
+      try: #horrible hack for trails that are in the current (2014 Q4) Trails download in RLIS
+        #discovery that are not in named_trails.csv because they were removed or whatever...
+        named_trails_out.write(named_trail['name']+","+ ";".join(str(x) for x in named_trail['segment_ids'])+","+ str(named_trail['named_trail_id'][0]) + ",,\n")
+      except:
+        pass
 
     named_trails_out.close()
 
@@ -430,64 +428,33 @@ if __name__ == "__main__":
     ########################################################
 
     #
-    ######################################################
+    ########################################################
 
-    ######################################################
+    ########################################################
     # write trail_segments.geojson
     #
     trail_segments_out = open(os.getcwd() + "/output/trail_segments.geojson", "w")
-    trail_segments_out.write(dumps({"type": "FeatureCollection",\
+    trail_segments_out.write(json.dumps({"type": "FeatureCollection",\
     "features": trail_segments}, indent=2) + "\n")
     trail_segments_out.close()
 
     print 'Created trail_segments.geojson'
     #
-    ######################################################
-
-
     ########################################################
-    # write stewards.csv
-    #
 
-    # load in the /data/stewards.json file 
-    # in order to lookup the address, url and phone.
-    steward_lookups = open(os.getcwd() + "/ref/stewards.json")
-    slookup = loads(steward_lookups.read())
-    steward_lookups.close()
-
-    stewards_out = open(os.getcwd() + "/output/stewards.csv", "w")
-    stewards_out.write('"name","id","url","phone","address","publisher","license"\n')
-
-    for k, v in sorted(stewards.iteritems()):
-    
-        uniqueness.append(v)
-
-        # basically looking up 
-        obj = next((x for x in slookup if x['name'] == k), {'url':'', 'phone': '', 'address':''})
-    
-        stewards_out.write('"'+k+'","'+v+'","'+obj['url']+'","'+obj['phone']+'","'+obj['address']+'","Oregon Metro - RLIS","Open Commons Open Database License (ODbL) and Content License (DbCL)"\n')
-
-    stewards_out.close()
-
-    # simple check stewards.id for dups to ensure no collisions
-    print "duplicate ids: " + str(get_duplicates(uniqueness))
-
-    print 'Created stewards.csv'
-    #
-    ######################################################
-
-    areas, stewards = process_areas(stewards)
+    #areas= process_areas()
 
     ########################################################
     # write areas.geojson
     #
+    sys.exit()
     areas_out = open(os.getcwd()+"/output/areas.geojson", "w")
-    areas_out.write(dumps({"type": "FeatureCollection",\
+    areas_out.write(json.dumps({"type": "FeatureCollection",\
     "features": areas}, indent=2) + "\n")
     areas_out.close()
 
     print 'Created areas.geojson'
     #
-    ######################################################
+    ########################################################
 
     print 'Process complete'
