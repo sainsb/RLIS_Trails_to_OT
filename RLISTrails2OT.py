@@ -401,9 +401,6 @@ if __name__ == "__main__":
     #####################################################
 
     #####################################################
-    # Load 
-
-    #####################################################
     # Load objects and arrays with calls to core functions
     #
     trail_segments, named_trails = process_trail_segments()
@@ -427,9 +424,6 @@ if __name__ == "__main__":
     #
     ########################################################
 
-    #
-    ########################################################
-
     ########################################################
     # write trail_segments.geojson
     #
@@ -441,13 +435,14 @@ if __name__ == "__main__":
     print 'Created trail_segments.geojson'
     #
     ########################################################
+    
+    sys.exit(1)
 
     #areas= process_areas()
-
+    arcc
     ########################################################
     # write areas.geojson
     #
-    sys.exit()
     areas_out = open(os.getcwd()+"/output/areas.geojson", "w")
     areas_out.write(json.dumps({"type": "FeatureCollection",\
     "features": areas}, indent=2) + "\n")
