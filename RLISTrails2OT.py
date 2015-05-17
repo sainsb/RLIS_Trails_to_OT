@@ -1,12 +1,12 @@
 #
-#  _____   _____  _______ __   _      _______  ______ _______ _____         
-# |     | |_____] |______ | \  |         |    |_____/ |_____|   |   |       
-# |_____| |       |______ |  \_|         |    |    \_ |     | __|__ |_____  
-#                                                                           
+#  _____   _____  _______ __   _      _______  ______ _______ _____
+# |     | |_____] |______ | \  |         |    |_____/ |_____|   |   |
+# |_____| |       |______ |  \_|         |    |    \_ |     | __|__ |_____
+#
 # _______  _____  __   _ _    _ _______  ______ _______ _____  _____  __   _
 # |       |     | | \  |  \  /  |______ |_____/ |______   |   |     | | \  |
 # |_____  |_____| |  \_|   \/   |______ |    \_ ______| __|__ |_____| |  \_|
-#                                                                           
+#
 
 # http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyshp
 import shapefile
@@ -31,6 +31,7 @@ WGS84 = pyproj.Proj("+init=EPSG:4326") # LatLon with WGS84 datum used for geojso
 ORSP = pyproj.Proj("+init=EPSG:2913", preserve_units=True) # datum used by Oregon Metro
 
 STEWARDS = []
+ORCA_SITES = {}
 
 if not os.path.exists(os.getcwd()+'/output'):
     """
@@ -44,8 +45,8 @@ def get_duplicates(arr):
     """
     dup_arr = arr[:]
     for i in set(arr):
-        dup_arr.remove(i)       
-    return list(set(dup_arr)) 
+        dup_arr.remove(i)
+    return list(set(dup_arr))
 
 def download(path, file):
     if not os.path.exists(os.getcwd()+'/src'):
@@ -118,7 +119,7 @@ def process_trail_segments():
 
     #iterate trails
     for sr in reader.shapeRecords():
-    
+
         atr = dict(zip(field_names, sr.record))
 
         # we're only allowing open existing trails to pass
@@ -150,7 +151,7 @@ def process_trail_segments():
 
             for point in geom['coordinates']:
                 n_geom.append(pyproj.transform(ORSP, WGS84, point[0], point[1]))
-            
+
             segment= collections.OrderedDict()
             segment['type']='Feature'
             segment['properties'] = props
@@ -163,7 +164,7 @@ def process_trail_segments():
                 named_trails.append({'atomic_name': atr['TRAILNAME']+'|'+atr['COUNTY'], 'name':atr['TRAILNAME'],'segment_ids':[atr['TRAILID']]})
               else:
                 [x for x in named_trails if x["atomic_name"]==atr['TRAILNAME']+'|'+atr['COUNTY']][0]['segment_ids'].append(atr['TRAILID'])
-             
+
             if atr['SYSTEMNAME'] != None and '   ' not in atr['SYSTEMNAME']:
               if len([x for x in named_trails if x['atomic_name']==atr['SYSTEMNAME']])==0:
                 named_trails.append({'atomic_name': atr['SYSTEMNAME'], 'name':atr['SYSTEMNAME'],'segment_ids':[atr['TRAILID']]})
@@ -187,13 +188,13 @@ def process_trail_segments():
 
     #identify duplicate geometries
     duplicates = [x for x in named_trails if len([y for y in all_arrays if compare_segment_arrays(x['segment_ids'],y)])>1]
- 
+
     glob_segs = None
 
     counter = 0
-    for dup in duplicates:  
+    for dup in duplicates:
       if glob_segs is None or not compare_segment_arrays(dup['segment_ids'],glob_segs):
-    
+
         #find ur buddy
         d = [x for x in duplicates if compare_segment_arrays(x['segment_ids'],dup['segment_ids'])]
         glob_segs = dup['segment_ids']
@@ -204,15 +205,15 @@ def process_trail_segments():
           named_trails.remove(to_remove[0])
         else:
           print 'no piped atomic name... I dunno'
-    
-    #step 2 - remove atomically stored trails (with county) that are pure 
+
+    #step 2 - remove atomically stored trails (with county) that are pure
     # subsets of a regional trail superset
     glob_name = None
     for trail in named_trails:
       if glob_name is None or trail['name'] != glob_name:
         dups = [x for x in named_trails if x['name']==trail['name']]
         glob_name = trail['name']
-    
+
         #determine the dup with the most segs *heinous*
         superset = max(enumerate(dups), key = lambda tup: len(tup[1]['segment_ids']))
         superitem = [x for x in dups if x==superset[1]][0]
@@ -238,7 +239,7 @@ def process_trail_segments():
         for test_trail in named_trails:
           if trail['name'] == test_trail['atomic_name']:
             #print trail['name'] + ' combined with regional trail'
-            #Insert whatever segments in trail that aren't in 
+            #Insert whatever segments in trail that aren't in
             #test_trail
 
             for segment in trail['segment_ids']:
@@ -257,7 +258,7 @@ def process_trail_segments():
       if '|' in trail['atomic_name']:
         county = trail['atomic_name'].split('|')[1].strip()
         name =  trail['atomic_name'].split('|')[0].strip()
-      
+
       else: #don't need the county == blank
         name = trail['atomic_name']
         county = ''
@@ -279,44 +280,44 @@ def process_trail_segments():
 
 def process_areas():
     # read the parks shapefile
-    reader = shapefile.Reader(os.getcwd()+'/src/orca.shp') #this is actually ORCA_sites_beta
+    reader = shapefile.Reader(os.getcwd()+'/src/orca_sites.shp') #this is actually ORCA_sites_beta
     fields = reader.fields[1:]
     field_names = [field[0] for field in fields]
 
     areas = []
     counter = 0
     for sr in reader.shapeRecords():
-        if counter == 10000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
+        # if counter == 10000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
         atr = dict(zip(field_names, sr.record))
 
-        if atr['STATUS'] == 'Closed': #We don't want any closed sites to show up.
-            continue
+        # if atr['STATUS'] == 'Closed': #We don't want any closed sites to show up.
+        #     continue
 
         """
-        SELECT * 
-        FROM   orca 
-        WHERE  county IN ( 'Clackamas', 'Multnomah', 'Washington' ) 
-               AND ( ( ownlev1 IN ( 'Private', 'Non-Profits' ) 
-                       AND ( unittype IN ( 'Natural Area', 'Other' ) 
-                             AND recreation = 'Yes' ) 
-                        OR conservation = 'High' ) 
-                      OR ( ownlev1 NOT IN ( 'Private', 'Non-Profits' ) 
-                           AND ( unittype = 'Other' 
-                                 AND ( recreation = 'Yes' 
-                                        OR conservation IN ( 'High', 'Medium' ) ) 
-                                  OR unittype = 'Natural Area' ) ) 
-                      OR ( ownlev2 = 'Non-profit Conservation' ) 
-                      OR ( unittype = 'Park' ) ) 
+        SELECT *
+        FROM   orca
+        WHERE  county IN ( 'Clackamas', 'Multnomah', 'Washington' )
+               AND ( ( ownlev1 IN ( 'Private', 'Non-Profits' )
+                       AND ( unittype IN ( 'Natural Area', 'Other' )
+                             AND recreation = 'Yes' )
+                        OR conservation = 'High' )
+                      OR ( ownlev1 NOT IN ( 'Private', 'Non-Profits' )
+                           AND ( unittype = 'Other'
+                                 AND ( recreation = 'Yes'
+                                        OR conservation IN ( 'High', 'Medium' ) )
+                                  OR unittype = 'Natural Area' ) )
+                      OR ( ownlev2 = 'Non-profit Conservation' )
+                      OR ( unittype = 'Park' ) )
         """
 
-        if atr['COUNTY'] in ['Clackamas', 'Multnomah', 'Washington'] and ((atr['OWNLEV1'] in ['Private', 'Non-Profits'] and (atr['UNITTYPE'] in ['Natural Area', 'Other'] and atr['RECREATION']=='Yes') or atr['CONSERVATI']=='High') or (atr['OWNLEV1'] not in ['Private', 'Non-Profits'] and (atr['UNITTYPE']== 'Other' and (atr['RECREATION']=='Yes' or atr['CONSERVATI'] in ['High', 'Medium']) or atr['UNITTYPE'] == 'Natural Area') ) or atr['OWNLEV2'] == 'Non-profit Conservation' or atr['UNITTYPE']== 'Park'):
-
+        # if atr['COUNTY'] in ['Clackamas', 'Multnomah', 'Washington'] and ((atr['OWNLEV1'] in ['Private', 'Non-Profits'] and (atr['UNITTYPE'] in ['Natural Area', 'Other'] and atr['RECREATION']=='Yes') or atr['CONSERVATI']=='High') or (atr['OWNLEV1'] not in ['Private', 'Non-Profits'] and (atr['UNITTYPE']== 'Other' and (atr['RECREATION']=='Yes' or atr['CONSERVATI'] in ['High', 'Medium']) or atr['UNITTYPE'] == 'Natural Area') ) or atr['OWNLEV2'] == 'Non-profit Conservation' or atr['UNITTYPE']== 'Park'):
+        if 1:
             props = collections.OrderedDict()
 
-            if atr['MANAGER'] not in stewards.iterkeys():
-                m = hashlib.sha224(atr['MANAGER']).hexdigest()
-                agency_id = str(int(m[-6:], 16))
-                stewards[atr['MANAGER']] = agency_id
+            # if atr['MANAGER'] not in stewards.iterkeys():
+            #     m = hashlib.sha224(atr['MANAGER']).hexdigest()
+            #     agency_id = str(int(m[-6:], 16))
+            #     stewards[atr['MANAGER']] = agency_id
 
             geom = sr.shape.__geo_interface__
 
@@ -343,8 +344,11 @@ def process_areas():
 
             props['name'] = atr['SITENAME']
 
-            props['id'] = atr['DISSOLVE_ID']
-            props['steward_id'] = STEWARDS[atr['MANAGER']]
+            props['id'] = int(atr['DISSOLVEID'])
+            if props['id'] in ORCA_SITES:
+                props['steward_id'] = ORCA_SITES[props['id']]
+            else:
+                props['steward_id'] = 0
             props['url'] = ''
             props['osm_tags'] = ''
 
@@ -366,7 +370,7 @@ if __name__ == "__main__":
     #####################################################
     # Download data from RLIS
     #
-    download(TRAILS_URL, 'trails')
+    # download(TRAILS_URL, 'trails')
     #download(ORCA_URL, 'orca')
     #
     #####################################################
@@ -396,6 +400,19 @@ if __name__ == "__main__":
       for row in NAMED_TRAIL_IDS:
         row[0] = int(row[0])
     print "Sucked up Named trail ids"
+
+    #####################################################
+    # Load Named Trails into Python object
+    #
+    with open(os.getcwd() + "/ref/orca_sites_to_steward.csv", mode='r') as infile:
+      reader = csv.reader(infile)
+      reader.next() #skip header line
+
+      for row in reader:
+        # print row
+        ORCA_SITES[int(row[0])] = int(row[1])
+    print "Sucked up orca sites"
+
     #
     #
     #####################################################
@@ -410,7 +427,7 @@ if __name__ == "__main__":
     #
     named_trails_out = open(os.getcwd() + "/output/named_trails.csv", "w")
     named_trails_out.write('"name","segment_ids","id","description","part_of"\n')
-    
+
     for named_trail in named_trails:
       try: #horrible hack for trails that are in the current (2014 Q4) Trails download in RLIS
         #discovery that are not in named_trails.csv because they were removed or whatever...
@@ -435,17 +452,17 @@ if __name__ == "__main__":
     print 'Created trail_segments.geojson'
     #
     ########################################################
-    
-    sys.exit(1)
 
-    #areas= process_areas()
-    arcc
+    # sys.exit(1)
+
+    areas= process_areas()
+
     ########################################################
     # write areas.geojson
     #
     areas_out = open(os.getcwd()+"/output/areas.geojson", "w")
     areas_out.write(json.dumps({"type": "FeatureCollection",\
-    "features": areas}, indent=2) + "\n")
+    "features": areas}, indent=2, encoding="Latin1") + "\n")
     areas_out.close()
 
     print 'Created areas.geojson'
