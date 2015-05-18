@@ -287,7 +287,7 @@ def process_areas():
     areas = []
     counter = 0
     for sr in reader.shapeRecords():
-        # if counter == 10000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
+        if counter == 1000: break #Take the 1st 10,000 features, ORCA is a supermassive YKW
         atr = dict(zip(field_names, sr.record))
 
         # if atr['STATUS'] == 'Closed': #We don't want any closed sites to show up.
@@ -348,7 +348,7 @@ def process_areas():
             if props['id'] in ORCA_SITES:
                 props['steward_id'] = ORCA_SITES[props['id']]
             else:
-                props['steward_id'] = 0
+                props['steward_id'] = 5127
             props['url'] = ''
             props['osm_tags'] = ''
 
@@ -431,7 +431,7 @@ if __name__ == "__main__":
     for named_trail in named_trails:
       try: #horrible hack for trails that are in the current (2014 Q4) Trails download in RLIS
         #discovery that are not in named_trails.csv because they were removed or whatever...
-        named_trails_out.write(named_trail['name']+","+ ";".join(str(x) for x in named_trail['segment_ids'])+","+ str(named_trail['named_trail_id'][0]) + ",,\n")
+        named_trails_out.write(named_trail['name']+","+ ";".join(str(int(x)) for x in named_trail['segment_ids'])+","+ str(named_trail['named_trail_id'][0]) + ",,\n")
       except:
         pass
 
